@@ -1,0 +1,45 @@
+.info-bar p {
+    margin: 0;
+}
+
+.info-bar p:nth-child(2) {
+    font-size: 0.75em;
+    color: #3c3c3cce;
+}
+
+.info-bar p:nth-child(3) {
+    font-size: 0.8em;
+}
+
+.hr-100percent {
+    width: 100%;
+    margin-top: 30px;
+}
+
+.margin-top-minus25 {
+    margin-top: -25px;
+}
+
+#travelDestinations a {
+    position: relative;
+}
+
+#travelDestinations a .tooltip {
+    visibility: hidden;
+    width: 70px;
+    background-color: #323232ee;
+    color: #ffffffee;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 5px;
+
+    position: absolute;
+    z-index: 1;
+    bottom: 150%;
+    left: 50%;
+    margin-left: -35px;
+}
+
+#travelDestinations a:hover .tooltip {
+    visibility: visible;
+}

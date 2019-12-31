@@ -1,0 +1,193 @@
+/* CSS Boilerplate Project by Eduardo Gil
+   ######### Flexbox based grid ######### */
+
+@import url(https://fonts.googleapis.com/css?family=Hind|Open+Sans:400,400italic,300,700,700italic);
+*, :after, :before {
+  box-sizing: border-box;
+}
+
+body {
+  margin: auto;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: #c6c6c6;
+  width: 75%;
+  margin-top: 50px;
+  margin-bottom: 50px;
+}
+
+.text-separator {
+  width: 100%;
+  margin-top: 25px;
+  border-top: 1px solid #c6c6c6;
+}
+
+.text-separator p {
+  position: relative;
+  background-color: white;
+  margin: 0 auto;
+  top: -1em;
+  width: 15%;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  line-height: 1.7;
+  font-size: 18px;
+  color: #3c3c3c;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Hind', sans-serif;
+  line-height: 1;
+  margin: 10px 0 10px 0;
+  color: #323232;
+}
+
+h1 {
+  font-size: 3rem;
+}
+
+h2 {
+  font-size: 2.5rem;
+}
+
+h3 {
+  font-size: 2.17rem;
+}
+
+h4 {
+  font-size: 2rem;
+}
+
+h5 {
+  font-size: 1.83rem;
+}
+
+h6 {
+  font-size: 1.67rem;
+}
+
+b, strong {
+  font-weight: 700;
+}
+
+i, em {
+  font-style: italic;
+}
+
+.center {
+  text-align: center;
+}
+
+.left {
+  text-align: left;
+}
+
+.right {
+  text-align: right;
+}
+
+.justify {
+  text-align: justify;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.flex-grow {
+  flex-grow: 1 !important;
+}
+
+.col-auto {
+  flex: 1 0 auto;
+}
+
+.col-1 {
+  flex: 0 0 8.33%;
+}
+
+.col-2 {
+  flex: 0 0 16.66%;
+}
+
+.col-3 {
+  flex: 0 0 24.99%;
+}
+
+.col-4 {
+  flex: 0 0 33.33%;
+}
+
+.col-5 {
+  flex: 0 0 41.66%;
+}
+
+.col-6 {
+  flex: 0 0 50%;
+}
+
+.col-7 {
+  flex: 0 0 58.33%;
+}
+
+.col-8 {
+  flex: 0 0 66.66%;
+}
+
+.col-9 {
+  flex: 0 0 74.99%;
+}
+
+.col-10 {
+  flex: 0 0 83.33%;
+}
+
+.col-11 {
+  flex: 0 0 91.66%;
+}
+
+.col-12 {
+  flex: 0 0 100%;
+}
+
+.content, .content-flat {
+  display: flex;
+  flex-direction: column;
+  padding: 25px 0;
+  margin: 0 5%;
+}
+
+.content-flat {
+  margin: 0;
+}
+
+.v-align {
+  justify-content: center;
+}
+
+.h-align {
+  align-items: center;
+}
+
+.debug {
+  background-color: #e6e6e6;
+  border-radius: 5px;
+  padding: 5px 5px;
+  margin: 5px;
+}
+
+.grey-block-300 {
+  height: 300px;
+  background-color: #e6e6e6;
+  border-radius: 5px;
+  padding: 5px 5px;
+  margin: 5px;
+}
