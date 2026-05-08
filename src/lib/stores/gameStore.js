@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store'
-import { getLocation, travelDistance, locations } from '../data/locations.js'
+import { getLocation, travelDistance, bodyPosition, cometPositionDU, pointSegmentDist, comets, locations } from '../data/locations.js'
 import { getShip } from '../data/ships.js'
 import { generateMarketStock, stockPrice, getCommodity, commodities } from '../data/commodities.js'
 import { rollEvent } from '../data/events.js'
@@ -147,7 +147,7 @@ export function startTravel(destinationId) {
     return
   }
 
-  const travelSecs = Math.max(3, Math.round(dist / $ship.speed))
+  const travelSecs = Math.max(30, Math.round(dist / $ship.speed))
   const arrivalTime = Date.now() + travelSecs * 1000
   const departedAt  = Date.now()
 
@@ -164,9 +164,42 @@ export function startTravel(destinationId) {
     statusMessage: `Travelling to ${to.name}`,
   }))
 
-  addLog(`Departed for ${to.name} — ETA ${travelSecs}s`, 'travel')
+  const etaMin = Math.round(travelSecs / 60)
+  addLog(`Departed for ${to.name} — ETA ${etaMin > 0 ? etaMin + 'm' : travelSecs + 's'}`, 'travel')
 
-  const event = rollEvent()
+  // Check if any comet's current position lies within 2 du of our route
+  const fromPos = bodyPosition(from)
+  const toPos   = bodyPosition(to)
+  let cometEvent = null
+  for (const comet of comets) {
+    const cp   = cometPositionDU(comet)
+    const dist2 = pointSegmentDist(cp.x, cp.y, fromPos.x, fromPos.y, toPos.x, toPos.y)
+    if (dist2 < 2) {
+      cometEvent = {
+        id: 'comet-encounter',
+        name: `${comet.name} Encounter`,
+        icon: '☄',
+        severity: 'info',
+        description: `Your route passes through ${comet.name}'s coma. Its tail is rich in harvestable material.`,
+        flavour: 'Through the viewport, a glittering ribbon of ice crystals stretches for thousands of kilometres.',
+        choices: [
+          {
+            label: 'Harvest the tail',
+            description: 'Collect organics and water ice from the coma. 45-second delay, but free cargo.',
+            effect: { type: 'comet_harvest', delay: 45 },
+          },
+          {
+            label: 'Continue on course',
+            description: 'No time for sightseeing.',
+            effect: { type: 'none' },
+          },
+        ],
+      }
+      break
+    }
+  }
+
+  const event = cometEvent ?? rollEvent()
   let eventFired = false
   const eventTriggerTime = event
     ? arrivalTime - travelSecs * 1000 * (0.3 + Math.random() * 0.5)
@@ -776,14 +809,15 @@ function replenishStock() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-// Pre-seed stock for player starting location and all NPC starting locations
-const seedLocations = ['earth', ...NPC_DEFS.map(d => d.startLoc)]
-for (const id of seedLocations) ensureMarketStock(id)
+// Pre-seed stock for all main planets (non-moons) so NPC trade routes open immediately
+for (const loc of locations) {
+  if (!loc.parentId && loc.id !== 'space') ensureMarketStock(loc.id)
+}
 
 addLog('Welcome to Space Flight Inc. Docked at Earth. Good luck, Commander.', 'info')
 
-// NPC AI — runs every 2 seconds
-setInterval(npcTick, 2000)
+// NPC AI — runs every 10 seconds
+setInterval(npcTick, 10000)
 
 // Stock replenishment — runs every 30 seconds
 setInterval(replenishStock, 30000)

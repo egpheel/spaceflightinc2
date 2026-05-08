@@ -48,15 +48,11 @@
 
   function setMaxBuy(id) {
     const max = maxBuy(id)
-    if (max > 0) {
-      quantities = { ...quantities, [id]: max }
-    }
+    if (max > 0) buyItem(id, max)
   }
   function setMaxSell(id) {
     const max = maxSell(id)
-    if (max > 0) {
-      quantities = { ...quantities, [id]: max }
-    }
+    if (max > 0) sellItem(id, max)
   }
 
   function stockPct(commodityId) {
@@ -231,14 +227,14 @@
                       />
                       {#if maxBuy(c.id) > 0}
                         <button
-                          class="px-1.5 py-1 rounded text-[9px] font-mono-space text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
-                          title="Set max buyable quantity"
-                          on:click={() => setMaxBuy(c.id)}
-                        >MAX</button>
-                        <button
                           class="px-2 py-1 rounded text-[10px] font-mono-space btn-primary"
                           on:click={() => handleBuy(c.id)}
                         >BUY</button>
+                        <button
+                          class="px-1.5 py-1 rounded text-[9px] font-mono-space text-cyan-400 hover:text-white hover:bg-slate-700 transition-colors"
+                          title="Buy maximum available quantity"
+                          on:click={() => setMaxBuy(c.id)}
+                        >ALL</button>
                       {:else}
                         <span class="text-[10px] text-slate-600 font-mono-space">
                           {p.stock === 0 ? 'Out of stock' : $player.credits < p.buyPrice ? 'No ¢' : 'No space'}
@@ -246,14 +242,14 @@
                       {/if}
                       {#if maxSell(c.id) > 0}
                         <button
-                          class="px-1.5 py-1 rounded text-[9px] font-mono-space text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
-                          title="Set max sellable quantity"
-                          on:click={() => setMaxSell(c.id)}
-                        >MAX</button>
-                        <button
                           class="px-2 py-1 rounded text-[10px] font-mono-space btn-danger"
                           on:click={() => handleSell(c.id)}
                         >SELL</button>
+                        <button
+                          class="px-1.5 py-1 rounded text-[9px] font-mono-space text-red-400 hover:text-white hover:bg-slate-700 transition-colors"
+                          title="Sell all of this commodity"
+                          on:click={() => setMaxSell(c.id)}
+                        >ALL</button>
                       {/if}
                     </div>
                   </td>

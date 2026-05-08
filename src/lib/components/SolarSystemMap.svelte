@@ -449,6 +449,15 @@
           fill={npc.color} opacity="0.8" filter="url(#glow)"/>
         <circle cx={npc.pos.x} cy={npc.pos.y} r="6"
           fill="none" stroke={npc.color} stroke-width="0.8" opacity="0.4"/>
+        <text
+          x={npc.pos.x} y={npc.pos.y - 9}
+          text-anchor="middle"
+          fill={npc.color}
+          font-size="5"
+          font-family="Space Mono, monospace"
+          pointer-events="none"
+          opacity="0.75"
+        >{npc.name}</text>
       {/if}
     {/each}
 

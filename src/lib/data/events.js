@@ -187,26 +187,6 @@ export const travelEvents = [
     ],
   },
   {
-    id: 'comet-encounter',
-    name: 'Comet Encounter',
-    icon: '☄',
-    severity: 'info',
-    description: "Your path has crossed a periodic comet's tail. Rich in organic compounds and ice.",
-    flavour: "Through the viewport, a glittering ribbon of ice crystals stretches for thousands of kilometres. Your cargo scoop is spinning up.",
-    choices: [
-      {
-        label: 'Harvest the tail',
-        description: 'Collect organics and water ice from the coma. 30-second delay, but free cargo.',
-        effect: { type: 'comet_harvest', delay: 30 },
-      },
-      {
-        label: 'Continue on course',
-        description: "No time for sightseeing.",
-        effect: { type: 'none' },
-      },
-    ],
-  },
-  {
     id: 'nav-beacon',
     name: 'Uncharted Beacon',
     icon: '📍',
