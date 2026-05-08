@@ -182,10 +182,13 @@
   $: playerPlanetLoc = playerParentId
     ? (topLevelLocations.find(l => l.id === playerParentId) ?? playerLoc)
     : (topLevelLocations.find(l => l.id === playerLoc?.id) ?? null)
-  $: playerPos = playerPlanetLoc ? getPlanetPos(playerPlanetLoc) : { x: 0, y: 0 }
+  $: playerPos = playerPlanetLoc
+    ? orbitPosition(playerPlanetLoc.orbitRadius, planetAngles[playerPlanetLoc.id] ?? playerPlanetLoc.startAngle ?? 0)
+    : { x: 0, y: 0 }
 
   // ── Player ship animated position (lerps during travel) ────────────────────
   $: playerShipPos = (() => {
+    const _ = planetAngles  // always re-run every animation frame
     if ($player.status === 'travelling'
         && $player.departedFromId
         && $player.travellingTo
@@ -196,8 +199,6 @@
       const from = getSVGPos($player.departedFromId)
       const to   = getSVGPos($player.travellingTo)
       if (from && to) {
-        // Reference planetAngles to recompute every frame
-        const _ = planetAngles
         return { x: lerp(from.x, to.x, frac), y: lerp(from.y, to.y, frac) }
       }
     }
@@ -211,7 +212,9 @@
         ? topLevelLocations.find(l => l.id === destLoc.parentId)
         : topLevelLocations.find(l => l.id === destLoc.id))
     : null
-  $: destPos = destPlanetLoc ? getPlanetPos(destPlanetLoc) : null
+  $: destPos = destPlanetLoc
+    ? orbitPosition(destPlanetLoc.orbitRadius, planetAngles[destPlanetLoc.id] ?? destPlanetLoc.startAngle ?? 0)
+    : null
 
   // ── Selected location ──────────────────────────────────────────────────────
   $: selectedLoc = getLocation($selectedLocationId)
@@ -231,6 +234,7 @@
 
   // ── NPC positions (also lerped) ────────────────────────────────────────────
   $: npcPositions = $npcs.map(npc => {
+    const _tick = planetAngles  // always re-run every animation frame
     if (npc.status === 'travelling'
         && npc.departedFromId && npc.travellingTo
         && npc.departedAt && npc.arrivalTime) {
@@ -239,7 +243,6 @@
       const from  = getSVGPos(npc.departedFromId)
       const to    = getSVGPos(npc.travellingTo)
       if (from && to) {
-        const _ = planetAngles  // recompute every frame
         return { ...npc, pos: { x: lerp(from.x, to.x, frac), y: lerp(from.y, to.y, frac) } }
       }
     }
@@ -394,7 +397,8 @@
 
     <!-- Planets -->
     {#each topLevelLocations as loc}
-      {@const pos     = getPlanetPos(loc)}
+      {@const angle      = planetAngles[loc.id] ?? loc.startAngle ?? 0}
+      {@const pos        = orbitPosition(loc.orbitRadius, angle)}
       {@const isSelected = selectedPlanetLoc?.id === loc.id}
       {@const reachable  = isReachable(loc)}
 
