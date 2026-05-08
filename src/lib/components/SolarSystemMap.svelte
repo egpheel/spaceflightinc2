@@ -3,7 +3,7 @@
   import { player, currentShip, selectedLocationId, npcs, startTravel } from '../stores/gameStore.js'
   import {
     locations, comets,
-    currentAngle, orbitPosition, travelDistance,
+    currentAngle, orbitPosition, bodyPosition, travelDistance,
     cometSVGPosition, cometOrbitEllipse,
     getLocation, getMoons, getPlanets,
   } from '../data/locations.js'
@@ -232,23 +232,43 @@
     return dist <= $currentShip.jumpDistance && loc.id !== $player.locationId
   }
 
-  // ── NPC positions (also lerped) ────────────────────────────────────────────
-  $: npcPositions = $npcs.map(npc => {
-    const _tick = planetAngles  // always re-run every animation frame
-    if (npc.status === 'travelling'
-        && npc.departedFromId && npc.travellingTo
-        && npc.departedAt && npc.arrivalTime) {
-      const total = npc.arrivalTime - npc.departedAt
-      const frac  = total > 0 ? (Date.now() - npc.departedAt) / total : 1
-      const from  = getSVGPos(npc.departedFromId)
-      const to    = getSVGPos(npc.travellingTo)
-      if (from && to) {
-        return { ...npc, pos: { x: lerp(from.x, to.x, frac), y: lerp(from.y, to.y, frac) } }
+  // ── NPC positions (lerped, sensor-filtered) ───────────────────────────────
+  $: npcPositions = (() => {
+    const _tick   = planetAngles  // re-run every animation frame
+    const pLoc    = getLocation($player.locationId) ?? getLocation($player.travellingTo)
+    const pDu     = pLoc ? bodyPosition(pLoc) : { x: 0, y: 0 }
+    const range   = $currentShip?.sensorRange ?? 100
+
+    return $npcs.map(npc => {
+      // Sensor range check in dunits
+      const nLocId = npc.status === 'travelling' ? (npc.travellingTo ?? npc.departedFromId) : npc.locationId
+      const nLoc   = getLocation(nLocId)
+      if (nLoc) {
+        const nDu = bodyPosition(nLoc)
+        const dx = pDu.x - nDu.x
+        const dy = pDu.y - nDu.y
+        if (Math.sqrt(dx * dx + dy * dy) > range) return null
       }
-    }
-    const pos = getSVGPos(npc.locationId)
-    return { ...npc, pos: pos ?? null }
-  })
+
+      if (npc.status === 'travelling'
+          && npc.departedFromId && npc.travellingTo
+          && npc.departedAt && npc.arrivalTime) {
+        const total = npc.arrivalTime - npc.departedAt
+        const frac  = total > 0 ? (Date.now() - npc.departedAt) / total : 1
+        const from  = getSVGPos(npc.departedFromId)
+        const to    = getSVGPos(npc.travellingTo)
+        if (from && to) {
+          return {
+            ...npc,
+            pos: { x: lerp(from.x, to.x, frac), y: lerp(from.y, to.y, frac) },
+            destPos: to,
+          }
+        }
+      }
+      const pos = getSVGPos(npc.locationId)
+      return { ...npc, pos: pos ?? null, destPos: null }
+    }).filter(Boolean)
+  })()
 
   // ── Planet moon overlay ────────────────────────────────────────────────────
   let focusedPlanetId = null
@@ -444,6 +464,17 @@
         text-anchor="middle" fill="rgba(226,232,240,0.7)"
         font-size="7" font-family="Space Mono, monospace"
         pointer-events="none">{loc.name}</text>
+    {/each}
+
+    <!-- NPC travel routes -->
+    {#each npcPositions as npc}
+      {#if npc.pos && npc.destPos}
+        <line
+          x1={npc.pos.x} y1={npc.pos.y}
+          x2={npc.destPos.x} y2={npc.destPos.y}
+          stroke={npc.color} stroke-width="0.6" stroke-dasharray="3 5" opacity="0.3"
+        />
+      {/if}
     {/each}
 
     <!-- NPC traders -->

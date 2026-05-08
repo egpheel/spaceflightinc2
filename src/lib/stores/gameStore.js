@@ -80,6 +80,7 @@ export const npcs = writable(
     departedAt: null,
     arrivalTime: null,
     cargo: {},
+    dwellUntil: Date.now() + (30 + Math.random() * 120) * 1000,
   }))
 )
 
@@ -702,11 +703,13 @@ function npcTick() {
         arrivalTime: null,
         cargo: {},
         credits: npc.credits + income,
+        dwellUntil: now + (60 + Math.random() * 180) * 1000,  // 1–4 min market dwell
       }
     }
 
-    // Find a trade route
+    // Find a trade route (only after dwell period expires)
     if (npc.status === 'docked') {
+      if (npc.dwellUntil && now < npc.dwellUntil) return npc
       const ship    = getShip(npc.shipId)
       const srcLoc  = getLocation(npc.locationId)
       const srcStock = $ms[npc.locationId]
@@ -768,6 +771,7 @@ function npcTick() {
           arrivalTime: now + secs * 1000,
           cargo: { [bestCommId]: bestQty },
           credits: npc.credits - cost,
+          dwellUntil: null,
         }
       }
     }
