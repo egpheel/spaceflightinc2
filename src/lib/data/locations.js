@@ -395,9 +395,9 @@ export function angularVelocity(periodDays) {
   return 360 / (periodDays * 86400 * 1000 / GAME_TIME_SCALE)  // deg/ms
 }
 
-export function currentAngle(startAngle, periodDays) {
+export function currentAngle(startAngle, periodDays, mult = 1) {
   const elapsed = Date.now() - START_EPOCH_MS
-  return (startAngle + elapsed * angularVelocity(periodDays)) % 360
+  return (startAngle + elapsed * angularVelocity(periodDays) * mult) % 360
 }
 
 // SVG x,y from display orbital radius and angle (degrees)

@@ -131,30 +131,34 @@
   function resetView() { vbX = -500; vbY = -500; vbW = 1000; vbH = 1000 }
 
   // ── Live orbit animation ───────────────────────────────────────────────────
+  // VISUAL_MULT speeds up displayed orbits so planets are visibly moving within
+  // a play session. Physics (bodyPosition / travelDistance) is unaffected.
+  const VISUAL_MULT = 500
+
   const topLevelLocations = getPlanets()
-  let planetAngles = {}
-  let cometPositions = {}
+  let now = Date.now()
   let animFrame
 
   function updateOrbits() {
-    const now  = Date.now()
-    const angles = {}
-    for (const loc of topLevelLocations) {
-      angles[loc.id] = loc.orbitalPeriodDays
-        ? currentAngle(loc.startAngle, loc.orbitalPeriodDays)
-        : (loc.startAngle ?? 0)
-    }
-    planetAngles = angles
-
-    const cPos = {}
-    for (const c of comets) cPos[c.id] = cometSVGPosition(c, now)
-    cometPositions = cPos
-
+    now = Date.now()   // reactive assignment — triggers all $: blocks below
     animFrame = requestAnimationFrame(updateOrbits)
   }
 
   onMount(() => { animFrame = requestAnimationFrame(updateOrbits) })
   onDestroy(() => { if (animFrame) cancelAnimationFrame(animFrame) })
+
+  // Derived from `now` so Svelte re-evaluates every animation frame
+  $: planetAngles = now ? Object.fromEntries(
+    topLevelLocations.map(loc => [loc.id,
+      loc.orbitalPeriodDays
+        ? currentAngle(loc.startAngle, loc.orbitalPeriodDays, VISUAL_MULT)
+        : (loc.startAngle ?? 0)
+    ])
+  ) : {}
+
+  $: cometPositions = now ? Object.fromEntries(
+    comets.map(c => [c.id, cometSVGPosition(c, now)])
+  ) : {}
 
   // ── Position helpers ───────────────────────────────────────────────────────
   function getPlanetPos(loc) {
