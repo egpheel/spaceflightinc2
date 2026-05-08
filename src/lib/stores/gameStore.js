@@ -228,7 +228,8 @@ export function startTravel(destinationId) {
       const affordable = event.choices.filter(c => !c.requiresCredits || get(player).credits >= c.requiresCredits)
       const pool   = affordable.length > 0 ? affordable : event.choices
       const choice = pool[Math.floor(Math.random() * pool.length)]
-      addLog(`[${event.name}] ${choice.description}`, 'warning')
+      addLog(`⚡ ENCOUNTER: ${event.name} — ${event.description ?? ''}`, 'warning')
+      addLog(`↳ ${choice.description}`, 'warning')
       const remaining = Math.max(0, $cur.arrivalTime - now)
       applyEffect(choice.effect, remaining, destinationId)
       return
