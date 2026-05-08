@@ -14,6 +14,7 @@ export const ships = [
     jumpDistance: 20,
     cargoCapacity: 12,
     price: 1500,
+    maxMileage: 50000,
     description: 'Entry-level scout. Quick across short hops but hauls almost nothing.',
   },
   {
@@ -24,6 +25,7 @@ export const ships = [
     jumpDistance: 26,
     cargoCapacity: 18,
     price: 3200,
+    maxMileage: 50000,
     description: 'Improved scout with a modest cargo bay. Good for early inner-system runs.',
   },
   {
@@ -34,6 +36,7 @@ export const ships = [
     jumpDistance: 33,
     cargoCapacity: 14,
     price: 6500,
+    maxMileage: 50000,
     description: 'Speed-optimised hull. Reaches Saturn from Jupiter in a single jump.',
   },
   {
@@ -44,11 +47,11 @@ export const ships = [
     jumpDistance: 40,
     cargoCapacity: 10,
     price: 12000,
+    maxMileage: 50000,
     description: 'Top-of-class scout. Near-instant inner hops. Minimal cargo — pure speed.',
   },
 
   // ─── Class: Courier ────────────────────────────────────────────────────────
-  // Balanced speed and cargo. The workhorse for most mid-game trade routes.
   {
     id: 'relay-mk1',
     name: 'Relay MK1',
@@ -57,6 +60,7 @@ export const ships = [
     jumpDistance: 22,
     cargoCapacity: 55,
     price: 4500,
+    maxMileage: 80000,
     description: 'The classic courier. Reliable, affordable, gets the job done.',
   },
   {
@@ -67,6 +71,7 @@ export const ships = [
     jumpDistance: 28,
     cargoCapacity: 70,
     price: 8500,
+    maxMileage: 80000,
     description: 'Upgraded relay with extended jump range. Can reach Saturn from Earth.',
   },
   {
@@ -77,6 +82,7 @@ export const ships = [
     jumpDistance: 34,
     cargoCapacity: 80,
     price: 14000,
+    maxMileage: 80000,
     description: 'Fast courier with solid cargo. A favourite among mid-tier traders.',
   },
   {
@@ -87,11 +93,11 @@ export const ships = [
     jumpDistance: 42,
     cargoCapacity: 90,
     price: 22000,
+    maxMileage: 80000,
     description: 'Premium courier. Long jump range covers the mid-outer system comfortably.',
   },
 
   // ─── Class: Freighter ──────────────────────────────────────────────────────
-  // Moderate speed, significant cargo. The backbone of serious trade operations.
   {
     id: 'iron-mule',
     name: 'Iron Mule',
@@ -100,6 +106,7 @@ export const ships = [
     jumpDistance: 16,
     cargoCapacity: 150,
     price: 9000,
+    maxMileage: 120000,
     description: "Slow but dependable. The trader's bread-and-butter for inner routes.",
   },
   {
@@ -110,6 +117,7 @@ export const ships = [
     jumpDistance: 20,
     cargoCapacity: 210,
     price: 16000,
+    maxMileage: 120000,
     description: 'A step up from the Iron Mule. More cargo, slightly longer range.',
   },
   {
@@ -120,6 +128,7 @@ export const ships = [
     jumpDistance: 24,
     cargoCapacity: 270,
     price: 24000,
+    maxMileage: 120000,
     description: 'Mid-tier freighter covering the asteroid belt and Jupiter routes well.',
   },
   {
@@ -130,11 +139,11 @@ export const ships = [
     jumpDistance: 28,
     cargoCapacity: 330,
     price: 34000,
+    maxMileage: 120000,
     description: 'Heavy freighter that keeps reasonable speed. Respected on outer routes.',
   },
 
   // ─── Class: Heavy Freighter ────────────────────────────────────────────────
-  // Massive cargo, very slow, short jump range. Maximum profit per run but inflexible.
   {
     id: 'titan-hauler',
     name: 'Titan Hauler',
@@ -143,6 +152,7 @@ export const ships = [
     jumpDistance: 13,
     cargoCapacity: 550,
     price: 40000,
+    maxMileage: 150000,
     description: 'Enormous cargo bay. Requires careful route planning around its limited range.',
   },
   {
@@ -153,6 +163,7 @@ export const ships = [
     jumpDistance: 10,
     cargoCapacity: 750,
     price: 58000,
+    maxMileage: 150000,
     description: 'Bulk carrier. Pair it with scout escorts and plan your hops carefully.',
   },
   {
@@ -163,6 +174,7 @@ export const ships = [
     jumpDistance: 8,
     cargoCapacity: 980,
     price: 80000,
+    maxMileage: 150000,
     description: 'A floating warehouse. Barely moves but single runs pay enormous sums.',
   },
   {
@@ -173,11 +185,11 @@ export const ships = [
     jumpDistance: 6,
     cargoCapacity: 1300,
     price: 115000,
+    maxMileage: 150000,
     description: 'The largest commercial ship available. Requires relay stations for outer runs.',
   },
 
   // ─── Class: Explorer ───────────────────────────────────────────────────────
-  // Very long jump range, moderate cargo. Built for the outer system.
   {
     id: 'wanderer',
     name: 'Wanderer',
@@ -186,6 +198,7 @@ export const ships = [
     jumpDistance: 60,
     cargoCapacity: 45,
     price: 18000,
+    maxMileage: 200000,
     description: 'Entry-level explorer. Its long range opens up the entire outer system.',
   },
   {
@@ -196,6 +209,7 @@ export const ships = [
     jumpDistance: 78,
     cargoCapacity: 40,
     price: 30000,
+    maxMileage: 200000,
     description: 'Can reach Neptune from Jupiter in a single jump. Premium deep-space hull.',
   },
   {
@@ -206,6 +220,7 @@ export const ships = [
     jumpDistance: 95,
     cargoCapacity: 35,
     price: 48000,
+    maxMileage: 200000,
     description: 'Covers the entire solar system in a handful of hops. Best-in-class range.',
   },
   {
@@ -216,6 +231,7 @@ export const ships = [
     jumpDistance: 120,
     cargoCapacity: 30,
     price: 75000,
+    maxMileage: 200000,
     description: 'End-game explorer. Earth to Pluto without stopping. Legendary range.',
   },
 ]

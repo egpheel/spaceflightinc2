@@ -1,83 +1,155 @@
 import { writable, derived, get } from 'svelte/store'
 import { getLocation, travelDistance, locations } from '../data/locations.js'
 import { getShip } from '../data/ships.js'
-import { generateMarketPrices, getCommodity, commodities } from '../data/commodities.js'
+import { generateMarketStock, stockPrice, getCommodity, commodities } from '../data/commodities.js'
 import { rollEvent } from '../data/events.js'
 
-// ─── State ──────────────────────────────────────────────────────────────────
+// ─── Player state ────────────────────────────────────────────────────────────
 
 export const player = writable({
   credits: 5000,
   shipId: 'dart-i',
-  cargo: {},           // { commodityId: quantity }
+  cargo: {},
   locationId: 'earth',
-  status: 'docked',    // 'docked' | 'travelling' | 'docking' | 'event'
+  status: 'docked',         // 'docked' | 'travelling' | 'docking' | 'event'
   travellingTo: null,
   arrivalTime: null,
   dockingUntil: null,
   statusMessage: 'Docked at Earth',
+  departedFromId: null,     // for travel animation
+  departedAt: null,
+  mileage: 0,               // dunits traveled with current ship
+  damage: 0,                // 0–100 damage %
+  fleet: [],                // [{ shipId, locationId, mileage, damage }] — stored ships
 })
+
+// ─── Market stock ─────────────────────────────────────────────────────────────
+// { [locationId]: { [commodityId]: { stock, stockCap, supplyRate, consumeRate, basePrice, isProducer, isConsumer } } }
+export const marketStock = writable({})
+
+// Derive live prices from stock levels
+export const marketPrices = derived(marketStock, $ms => {
+  const result = {}
+  for (const [locId, locStock] of Object.entries($ms)) {
+    result[locId] = {}
+    for (const [commId, info] of Object.entries(locStock)) {
+      result[locId][commId] = stockPrice(info)
+    }
+  }
+  return result
+})
+
+// ─── NPC traders ─────────────────────────────────────────────────────────────
+
+const NPC_DEFS = [
+  { id: 'npc-rex',   name: 'Trader Rex',   shipId: 'relay-mk1',    startLoc: 'mars',     color: '#f97316', credits: 8000 },
+  { id: 'npc-luna',  name: 'Luna Chen',    shipId: 'dart-ii',      startLoc: 'luna',     color: '#a855f7', credits: 5000 },
+  { id: 'npc-iron',  name: 'Iron Mike',    shipId: 'cargo-king',   startLoc: 'ceres',    color: '#22c55e', credits: 15000 },
+  { id: 'npc-void',  name: 'Void Walker',  shipId: 'wanderer',     startLoc: 'jupiter',  color: '#eab308', credits: 12000 },
+  { id: 'npc-sable', name: 'Sable Ryn',    shipId: 'swift-arrow',  startLoc: 'earth',    color: '#ec4899', credits: 10000 },
+  { id: 'npc-bjorn', name: 'Bjorn Astro',  shipId: 'iron-mule',    startLoc: 'venus',    color: '#06b6d4', credits: 7000 },
+  { id: 'npc-kit',   name: 'Kit Varis',    shipId: 'phantom',      startLoc: 'titan',    color: '#f43f5e', credits: 9000 },
+  { id: 'npc-otto',  name: 'Otto Flux',    shipId: 'relay-mk2',    startLoc: 'ganymede', color: '#84cc16', credits: 11000 },
+]
+
+export const npcs = writable(
+  NPC_DEFS.map(d => ({
+    id: d.id,
+    name: d.name,
+    shipId: d.shipId,
+    color: d.color,
+    credits: d.credits,
+    locationId: d.startLoc,
+    status: 'docked',
+    travellingTo: null,
+    departedFromId: null,
+    departedAt: null,
+    arrivalTime: null,
+    cargo: {},
+  }))
+)
+
+// ─── Misc stores ─────────────────────────────────────────────────────────────
 
 export const logs = writable([])
 export const pendingEvent = writable(null)
 export const selectedLocationId = writable('earth')
-export const marketPrices = writable({})
 
-// ─── Derived ────────────────────────────────────────────────────────────────
+// ─── Derived ─────────────────────────────────────────────────────────────────
 
 export const currentLocation = derived(player, $p => getLocation($p.locationId))
-export const currentShip = derived(player, $p => getShip($p.shipId))
+export const currentShip     = derived(player, $p => getShip($p.shipId))
 
 export const cargoUnits = derived(player, $p =>
-  Object.values($p.cargo).reduce((sum, q) => sum + q, 0)
+  Object.values($p.cargo).reduce((s, q) => s + q, 0)
 )
 
 export const cargoValue = derived([player, marketPrices], ([$p, $mp]) => {
-  const locId = $p.locationId
-  const prices = $mp[locId]
+  const prices = $mp[$p.locationId]
   if (!prices) return 0
   return Object.entries($p.cargo).reduce((sum, [id, qty]) => {
     return sum + (prices[id]?.sellPrice ?? 0) * qty
   }, 0)
 })
 
-// ─── Internal helpers ────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
-let travelInterval = null
+let travelInterval  = null
 let dockingInterval = null
 
 function addLog(message, type = 'info') {
   logs.update(ls => [{ message, type, time: new Date().toLocaleTimeString() }, ...ls.slice(0, 49)])
 }
 
-function ensureMarketPrices(locationId) {
-  const mp = get(marketPrices)
-  if (!mp[locationId]) {
+function ensureMarketStock(locationId) {
+  const ms = get(marketStock)
+  if (!ms[locationId]) {
     const loc = getLocation(locationId)
     if (loc) {
-      marketPrices.update(m => ({ ...m, [locationId]: generateMarketPrices(loc) }))
+      marketStock.update(m => ({ ...m, [locationId]: generateMarketStock(loc) }))
     }
   }
 }
 
-// ─── Travel ─────────────────────────────────────────────────────────────────
+function trimCargo(cargo, capacity) {
+  const newCargo = { ...cargo }
+  let total = Object.values(newCargo).reduce((s, q) => s + q, 0)
+  for (const id of Object.keys(newCargo)) {
+    if (total <= capacity) break
+    const excess  = total - capacity
+    const remove  = Math.min(newCargo[id], excess)
+    newCargo[id] -= remove
+    if (newCargo[id] <= 0) delete newCargo[id]
+    total -= remove
+  }
+  return newCargo
+}
+
+export function tradeInValue(ship, mileage, damage) {
+  const mileageFactor = Math.max(0, 1 - (mileage / (ship.maxMileage ?? 100000)) * 0.30)
+  const damageFactor  = Math.max(0, 1 - damage / 100)
+  return Math.round(ship.price * 0.55 * mileageFactor * damageFactor)
+}
+
+// ─── Travel ──────────────────────────────────────────────────────────────────
 
 export function startTravel(destinationId) {
-  const $player = get(player)
-  const $ship = getShip($player.shipId)
-  const fromLoc = getLocation($player.locationId)
-  const toLoc = getLocation(destinationId)
+  const $p    = get(player)
+  const $ship = getShip($p.shipId)
+  const from  = getLocation($p.locationId)
+  const to    = getLocation(destinationId)
 
-  if (!toLoc || !$ship) return
+  if (!to || !$ship) return
 
-  const dist = travelDistance(fromLoc, toLoc)
+  const dist = travelDistance(from, to)
   if (dist > $ship.jumpDistance) {
-    addLog(`${toLoc.name} is out of jump range (${dist.toFixed(1)} > ${$ship.jumpDistance} dunits)`, 'warning')
+    addLog(`${to.name} is out of jump range (${dist.toFixed(1)} > ${$ship.jumpDistance} du)`, 'warning')
     return
   }
 
   const travelSecs = Math.max(3, Math.round(dist / $ship.speed))
   const arrivalTime = Date.now() + travelSecs * 1000
+  const departedAt  = Date.now()
 
   if (travelInterval) clearInterval(travelInterval)
 
@@ -87,62 +159,62 @@ export function startTravel(destinationId) {
     locationId: 'space',
     travellingTo: destinationId,
     arrivalTime,
-    statusMessage: `Travelling to ${toLoc.name}`,
+    departedFromId: p.locationId,
+    departedAt,
+    statusMessage: `Travelling to ${to.name}`,
   }))
 
-  addLog(`Departed for ${toLoc.name} — ETA ${travelSecs}s`, 'travel')
+  addLog(`Departed for ${to.name} — ETA ${travelSecs}s`, 'travel')
 
-  // Roll for a random event partway through
   const event = rollEvent()
   let eventFired = false
-  const eventTriggerTime = event ? arrivalTime - travelSecs * 1000 * (0.3 + Math.random() * 0.5) : null
+  const eventTriggerTime = event
+    ? arrivalTime - travelSecs * 1000 * (0.3 + Math.random() * 0.5)
+    : null
 
   travelInterval = setInterval(() => {
     const now = Date.now()
-    const $p = get(player)
+    const $cur = get(player)
 
-    // Fire random event
-    if (event && !eventFired && eventTriggerTime && now >= eventTriggerTime && $p.status === 'travelling') {
+    if (event && !eventFired && eventTriggerTime && now >= eventTriggerTime && $cur.status === 'travelling') {
       eventFired = true
       clearInterval(travelInterval)
-      pendingEvent.set({ ...event, destinationId, originalArrivalTime: $p.arrivalTime })
+      pendingEvent.set({ ...event, destinationId, originalArrivalTime: $cur.arrivalTime })
       player.update(p => ({ ...p, status: 'event' }))
       return
     }
 
-    if (now >= $p.arrivalTime && $p.status === 'travelling') {
+    if (now >= $cur.arrivalTime && $cur.status === 'travelling') {
       clearInterval(travelInterval)
-      beginDocking(destinationId)
+      beginDocking(destinationId, dist)
     }
   }, 500)
 }
 
 export function resumeAfterEvent(remainingMs) {
-  const $player = get(player)
-  const destinationId = $player.travellingTo
+  const $p = get(player)
+  const destinationId  = $p.travellingTo
   const newArrivalTime = Date.now() + remainingMs
 
-  player.update(p => ({
-    ...p,
-    status: 'travelling',
-    arrivalTime: newArrivalTime,
-  }))
+  player.update(p => ({ ...p, status: 'travelling', arrivalTime: newArrivalTime }))
 
   travelInterval = setInterval(() => {
-    const now = Date.now()
-    const $p = get(player)
-    if (now >= $p.arrivalTime && $p.status === 'travelling') {
+    const now  = Date.now()
+    const $cur = get(player)
+    if (now >= $cur.arrivalTime && $cur.status === 'travelling') {
       clearInterval(travelInterval)
-      beginDocking(destinationId)
+      // Use the dist from current loc — we skip exact recalc for simplicity
+      beginDocking(destinationId, 0)
     }
   }, 500)
 }
 
-function beginDocking(destinationId) {
-  const loc = getLocation(destinationId)
+function beginDocking(destinationId, dist) {
+  const loc      = getLocation(destinationId)
   const dockSecs = 4
   const dockingUntil = Date.now() + dockSecs * 1000
 
+  // Track mileage
   player.update(p => ({
     ...p,
     status: 'docking',
@@ -150,15 +222,18 @@ function beginDocking(destinationId) {
     travellingTo: null,
     arrivalTime: null,
     dockingUntil,
+    departedFromId: null,
+    departedAt: null,
     statusMessage: `Docking at ${loc?.name}`,
+    mileage: p.mileage + dist,
   }))
 
   addLog(`Arrived at ${loc?.name} — docking`, 'travel')
 
   dockingInterval = setInterval(() => {
-    const now = Date.now()
-    const $p = get(player)
-    if (now >= $p.dockingUntil) {
+    const now  = Date.now()
+    const $cur = get(player)
+    if (now >= $cur.dockingUntil) {
       clearInterval(dockingInterval)
       completeDocking(destinationId)
     }
@@ -167,7 +242,7 @@ function beginDocking(destinationId) {
 
 function completeDocking(locationId) {
   const loc = getLocation(locationId)
-  ensureMarketPrices(locationId)
+  ensureMarketStock(locationId)
 
   player.update(p => ({
     ...p,
@@ -181,24 +256,22 @@ function completeDocking(locationId) {
   addLog(`Docked at ${loc?.name}`, 'info')
 }
 
-// ─── Event resolution ────────────────────────────────────────────────────────
+// ─── Event resolution ─────────────────────────────────────────────────────────
 
 export function resolveEvent(choiceIndex) {
   const event = get(pendingEvent)
   if (!event) return
 
-  const choice = event.choices[choiceIndex]
-  const effect = choice.effect
-  const $player = get(player)
+  const choice     = event.choices[choiceIndex]
+  const effect     = choice.effect
   const remainingMs = Math.max(0, event.originalArrivalTime - Date.now())
 
   pendingEvent.set(null)
-
   applyEffect(effect, remainingMs, event.destinationId)
 }
 
 function applyEffect(effect, remainingMs, destinationId) {
-  const $player = get(player)
+  const $p = get(player)
 
   switch (effect.type) {
     case 'none':
@@ -219,9 +292,16 @@ function applyEffect(effect, remainingMs, destinationId) {
       break
     }
 
+    case 'damage': {
+      const dmgPct = effect.amount ?? 10
+      player.update(p => ({ ...p, damage: Math.min(100, p.damage + dmgPct) }))
+      resumeAfterEvent(remainingMs)
+      addLog(`Ship took ${dmgPct}% damage!`, 'danger')
+      break
+    }
+
     case 'pirate_toll': {
-      const $cv = get(cargoValue)
-      const toll = Math.round($cv * effect.percent)
+      const toll = Math.round(get(cargoValue) * effect.percent)
       player.update(p => ({ ...p, credits: Math.max(0, p.credits - toll) }))
       resumeAfterEvent(remainingMs)
       addLog(`Paid pirate toll: ${toll} ¢.`, 'danger')
@@ -229,8 +309,8 @@ function applyEffect(effect, remainingMs, destinationId) {
     }
 
     case 'escape_attempt': {
-      const success = Math.random() > 0.5
-      if (success) {
+      const ok = Math.random() > 0.5
+      if (ok) {
         resumeAfterEvent(remainingMs)
         addLog('Escaped the pirates!', 'info')
       } else {
@@ -240,8 +320,8 @@ function applyEffect(effect, remainingMs, destinationId) {
     }
 
     case 'distress_rescue': {
-      const success = Math.random() < 0.4
-      if (success) {
+      const ok = Math.random() < 0.4
+      if (ok) {
         resumeAfterEvent(remainingMs)
         addLog('Alliance patrol arrived in time — pirates fled!', 'info')
       } else {
@@ -257,7 +337,7 @@ function applyEffect(effect, remainingMs, destinationId) {
         for (const id of Object.keys(newCargo)) {
           if (toRemove <= 0) break
           const remove = Math.min(newCargo[id], toRemove)
-          newCargo[id] = (newCargo[id] || 0) - remove
+          newCargo[id] -= remove
           if (newCargo[id] <= 0) delete newCargo[id]
           toRemove -= remove
         }
@@ -270,12 +350,10 @@ function applyEffect(effect, remainingMs, destinationId) {
 
     case 'salvage': {
       const value = Math.round(effect.minValue + Math.random() * (effect.maxValue - effect.minValue))
-      const commodityIds = commodities.map(c => c.id)
-      const id = commodityIds[Math.floor(Math.random() * commodityIds.length)]
-      const ship = getShip($player.shipId)
-      const current = get(cargoUnits)
-      const space = (ship?.cargoCapacity ?? 50) - current
-      const qty = Math.max(1, Math.min(Math.floor(value / 50), space))
+      const id    = commodities[Math.floor(Math.random() * commodities.length)].id
+      const ship  = getShip($p.shipId)
+      const space = (ship?.cargoCapacity ?? 50) - get(cargoUnits)
+      const qty   = Math.max(1, Math.min(Math.floor(value / 50), space))
       if (qty > 0) {
         player.update(p => ({
           ...p,
@@ -295,16 +373,15 @@ function applyEffect(effect, remainingMs, destinationId) {
 
     case 'wormhole': {
       const topLevel = locations.filter(l => !l.parentId && l.id !== 'space')
-      const dest = topLevel[Math.floor(Math.random() * topLevel.length)]
+      const dest     = topLevel[Math.floor(Math.random() * topLevel.length)]
       clearInterval(travelInterval)
       addLog(`Wormhole! Emerged near ${dest.name}.`, 'info')
-      beginDocking(dest.id)
+      beginDocking(dest.id, 0)
       break
     }
 
     case 'risky_push': {
-      const fails = Math.random() < effect.failChance
-      if (fails) {
+      if (Math.random() < effect.failChance) {
         applyEffect(effect.failEffect, remainingMs, destinationId)
       } else {
         resumeAfterEvent(remainingMs)
@@ -314,13 +391,12 @@ function applyEffect(effect, remainingMs, destinationId) {
     }
 
     case 'sell_premium': {
-      const $mp = get(marketPrices)
-      const closestPlanet = getLocation($player.travellingTo ?? $player.locationId)
-      const prices = $mp[closestPlanet?.id]
-      if (prices && Object.keys($player.cargo).length > 0) {
-        let bestId = null
-        let bestQty = 0
-        for (const [id, qty] of Object.entries($player.cargo)) {
+      const $mp  = get(marketPrices)
+      const dest = getLocation($p.travellingTo ?? $p.locationId)
+      const prices = $mp[dest?.id]
+      if (prices) {
+        let bestId = null, bestQty = 0
+        for (const [id, qty] of Object.entries($p.cargo)) {
           if (qty > bestQty) { bestId = id; bestQty = qty }
         }
         if (bestId && prices[bestId]) {
@@ -338,21 +414,20 @@ function applyEffect(effect, remainingMs, destinationId) {
     }
 
     case 'comet_harvest': {
-      const ship = getShip($player.shipId)
-      const current = get(cargoUnits)
-      const space = Math.min(15, (ship?.cargoCapacity ?? 50) - current)
+      const ship  = getShip($p.shipId)
+      const space = Math.min(15, (ship?.cargoCapacity ?? 50) - get(cargoUnits))
       if (space > 0) {
-        const organicsQty = Math.ceil(space * 0.6)
-        const waterQty = Math.floor(space * 0.4)
+        const org   = Math.ceil(space * 0.6)
+        const water = Math.floor(space * 0.4)
         player.update(p => ({
           ...p,
           cargo: {
             ...p.cargo,
-            organics: (p.cargo.organics ?? 0) + organicsQty,
-            water: (p.cargo.water ?? 0) + waterQty,
+            organics: (p.cargo.organics ?? 0) + org,
+            water:    (p.cargo.water    ?? 0) + water,
           },
         }))
-        addLog(`Harvested ${organicsQty}t organics and ${waterQty}t water ice from comet.`, 'info')
+        addLog(`Harvested ${org}t organics and ${water}t water ice from comet.`, 'info')
       }
       resumeAfterEvent(remainingMs + effect.delay * 1000)
       break
@@ -366,43 +441,53 @@ function applyEffect(effect, remainingMs, destinationId) {
 // ─── Trading ─────────────────────────────────────────────────────────────────
 
 export function buyItem(commodityId, quantity) {
-  const $player = get(player)
-  const $mp = get(marketPrices)
-  const prices = $mp[$player.locationId]
-  const ship = getShip($player.shipId)
-  const currentUnits = get(cargoUnits)
+  const $p    = get(player)
+  const $mp   = get(marketPrices)
+  const $ms   = get(marketStock)
+  const ship  = getShip($p.shipId)
+  const prices = $mp[$p.locationId]
 
-  if (!prices || $player.status !== 'docked') return
-  const price = prices[commodityId]?.buyPrice ?? 0
-  const totalCost = price * quantity
-  const spaceAvailable = ship.cargoCapacity - currentUnits
+  if (!prices || $p.status !== 'docked') return
 
-  if (quantity > spaceAvailable) {
-    addLog('Not enough cargo space.', 'warning'); return
-  }
-  if ($player.credits < totalCost) {
-    addLog('Not enough credits.', 'warning'); return
-  }
+  const available = $ms[$p.locationId]?.[commodityId]?.stock ?? 0
+  const actualQty = Math.min(quantity, available)
+  if (actualQty <= 0) { addLog('None in stock.', 'warning'); return }
+
+  const price    = prices[commodityId]?.buyPrice ?? 0
+  const totalCost = price * actualQty
+  const space    = (ship?.cargoCapacity ?? 0) - get(cargoUnits)
+
+  if (actualQty > space) { addLog('Not enough cargo space.', 'warning'); return }
+  if ($p.credits < totalCost) { addLog('Not enough credits.', 'warning'); return }
 
   player.update(p => ({
     ...p,
     credits: p.credits - totalCost,
-    cargo: { ...p.cargo, [commodityId]: (p.cargo[commodityId] ?? 0) + quantity },
+    cargo: { ...p.cargo, [commodityId]: (p.cargo[commodityId] ?? 0) + actualQty },
   }))
-  addLog(`Bought ${quantity}t ${getCommodity(commodityId)?.name} for ${totalCost} ¢.`, 'trade')
+
+  marketStock.update(ms => {
+    const locStock = { ...ms[$p.locationId] }
+    locStock[commodityId] = { ...locStock[commodityId], stock: Math.max(0, locStock[commodityId].stock - actualQty) }
+    return { ...ms, [$p.locationId]: locStock }
+  })
+
+  addLog(`Bought ${actualQty}t ${getCommodity(commodityId)?.name} for ${totalCost} ¢.`, 'trade')
 }
 
 export function sellItem(commodityId, quantity) {
-  const $player = get(player)
-  const $mp = get(marketPrices)
-  const prices = $mp[$player.locationId]
+  const $p    = get(player)
+  const $mp   = get(marketPrices)
+  const $ms   = get(marketStock)
+  const prices = $mp[$p.locationId]
 
-  if (!prices || $player.status !== 'docked') return
-  const inCargo = $player.cargo[commodityId] ?? 0
+  if (!prices || $p.status !== 'docked') return
+
+  const inCargo  = $p.cargo[commodityId] ?? 0
   const actualQty = Math.min(quantity, inCargo)
   if (actualQty <= 0) return
 
-  const price = prices[commodityId]?.sellPrice ?? 0
+  const price  = prices[commodityId]?.sellPrice ?? 0
   const income = price * actualQty
 
   player.update(p => {
@@ -411,49 +496,294 @@ export function sellItem(commodityId, quantity) {
     if (newCargo[commodityId] <= 0) delete newCargo[commodityId]
     return { ...p, credits: p.credits + income, cargo: newCargo }
   })
+
+  if ($ms[$p.locationId]?.[commodityId]) {
+    marketStock.update(ms => {
+      const locStock = { ...ms[$p.locationId] }
+      const info = locStock[commodityId]
+      locStock[commodityId] = { ...info, stock: Math.min(info.stockCap, info.stock + actualQty) }
+      return { ...ms, [$p.locationId]: locStock }
+    })
+  }
+
   addLog(`Sold ${actualQty}t ${getCommodity(commodityId)?.name} for ${income} ¢.`, 'trade')
 }
 
-// ─── Ship store ──────────────────────────────────────────────────────────────
+// ─── Ship fleet ──────────────────────────────────────────────────────────────
 
-export function buyShip(newShipId) {
-  const $player = get(player)
-  const currentShipData = getShip($player.shipId)
+export function buyShip(newShipId, action) {
+  // action: 'tradein' | 'store'
+  const $p        = get(player)
+  const curShip   = getShip($p.shipId)
   const newShipData = getShip(newShipId)
-  const loc = getLocation($player.locationId)
+  const loc       = getLocation($p.locationId)
 
-  if (!newShipData || !loc?.hasShipyard || $player.status !== 'docked') return
+  if (!newShipData || !loc?.hasShipyard || $p.status !== 'docked') return
+  if (newShipId === $p.shipId) return
 
-  const tradeinValue = Math.round((currentShipData?.price ?? 0) * 0.55)
-  const netCost = newShipData.price - tradeinValue
+  const tiv    = tradeInValue(curShip, $p.mileage, $p.damage)
+  const credit = action === 'tradein' ? tiv : 0
+  const netCost = newShipData.price - credit
 
-  if ($player.credits < netCost) {
-    addLog(`Not enough credits. Need ${netCost} ¢ (after ${tradeinValue} ¢ trade-in).`, 'warning'); return
+  if ($p.credits < netCost) {
+    addLog(`Need ${netCost.toLocaleString()} ¢ (after ${credit.toLocaleString()} ¢ trade-in).`, 'warning')
+    return
   }
 
-  // Trim cargo to new ship's capacity
-  const newCapacity = newShipData.cargoCapacity
-  const newCargo = { ...$player.cargo }
-  let total = Object.values(newCargo).reduce((s, q) => s + q, 0)
-  for (const id of Object.keys(newCargo)) {
-    if (total <= newCapacity) break
-    const excess = total - newCapacity
-    const remove = Math.min(newCargo[id], excess)
-    newCargo[id] -= remove
-    if (newCargo[id] <= 0) delete newCargo[id]
-    total -= remove
+  const newCargo = trimCargo($p.cargo, newShipData.cargoCapacity)
+  let newFleet   = [...$p.fleet]
+
+  if (action === 'store') {
+    newFleet.push({
+      shipId:     $p.shipId,
+      locationId: $p.locationId,
+      mileage:    $p.mileage,
+      damage:     $p.damage,
+    })
   }
 
   player.update(p => ({
     ...p,
     credits: p.credits - netCost,
-    shipId: newShipId,
-    cargo: newCargo,
+    shipId:  newShipId,
+    cargo:   newCargo,
+    mileage: 0,
+    damage:  0,
+    fleet:   newFleet,
   }))
-  addLog(`Purchased ${newShipData.name} for ${netCost} ¢ net (${tradeinValue} ¢ trade-in).`, 'info')
+
+  const verb = action === 'tradein'
+    ? `Traded in ${curShip?.name} (${tiv.toLocaleString()} ¢), bought ${newShipData.name}.`
+    : `Stored ${curShip?.name} here, boarded ${newShipData.name}.`
+  addLog(verb, 'info')
 }
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+export function retrieveShip(fleetShipId) {
+  const $p  = get(player)
+  const loc = getLocation($p.locationId)
+  if (!loc?.hasShipyard || $p.status !== 'docked') return
 
-ensureMarketPrices('earth')
+  const idx = $p.fleet.findIndex(f => f.shipId === fleetShipId && f.locationId === $p.locationId)
+  if (idx === -1) return
+
+  const stored    = $p.fleet[idx]
+  const newFleet  = $p.fleet.filter((_, i) => i !== idx)
+  const newShipData = getShip(fleetShipId)
+  const newCargo  = trimCargo($p.cargo, newShipData?.cargoCapacity ?? 50)
+
+  // Put current ship into fleet at this location
+  newFleet.push({
+    shipId:     $p.shipId,
+    locationId: $p.locationId,
+    mileage:    $p.mileage,
+    damage:     $p.damage,
+  })
+
+  player.update(p => ({
+    ...p,
+    shipId:  fleetShipId,
+    cargo:   newCargo,
+    mileage: stored.mileage,
+    damage:  stored.damage,
+    fleet:   newFleet,
+  }))
+
+  const curName = getShip($p.shipId)?.name
+  addLog(`Swapped to ${newShipData?.name}. Stored ${curName} at ${loc.name}.`, 'info')
+}
+
+// ─── NPC AI ───────────────────────────────────────────────────────────────────
+
+// Inline price calculation mirroring stockPrice() to avoid import cycles
+function npcBuyPrice(info) {
+  const ratio = info.stockCap > 0 ? Math.min(1, info.stock / info.stockCap) : 0.5
+  const mult  = info.isProducer ? 0.30 + (1-ratio)*0.25
+              : info.isConsumer ? 1.50 + (1-ratio)*1.30
+              : 0.85 + (1-ratio)*0.30
+  return Math.round(info.basePrice * Math.max(0.1, mult) * 1.08)
+}
+function npcSellPrice(info) {
+  const ratio = info.stockCap > 0 ? Math.min(1, info.stock / info.stockCap) : 0.5
+  const mult  = info.isProducer ? 0.30 + (1-ratio)*0.25
+              : info.isConsumer ? 1.50 + (1-ratio)*1.30
+              : 0.85 + (1-ratio)*0.30
+  return Math.round(info.basePrice * Math.max(0.1, mult) * 0.72)
+}
+
+function npcTick() {
+  const $ms   = get(marketStock)
+  const $npcs = get(npcs)
+  const now   = Date.now()
+
+  // Collect all stock changes as deltas, apply once at end
+  const stockDeltas = {}  // { locId: { commId: delta } }
+  function addDelta(locId, commId, delta) {
+    if (!stockDeltas[locId]) stockDeltas[locId] = {}
+    stockDeltas[locId][commId] = (stockDeltas[locId][commId] ?? 0) + delta
+  }
+  function effectiveStock(locId, commId) {
+    const base  = $ms[locId]?.[commId]?.stock ?? 0
+    const delta = stockDeltas[locId]?.[commId] ?? 0
+    return Math.max(0, base + delta)
+  }
+
+  const updated = $npcs.map(npc => {
+    // Arrived?
+    if (npc.status === 'travelling' && now >= npc.arrivalTime) {
+      const destStock = $ms[npc.travellingTo]
+      let income = 0
+      if (destStock) {
+        for (const [commId, qty] of Object.entries(npc.cargo)) {
+          const info = destStock[commId]
+          if (info) {
+            income += npcSellPrice(info) * qty
+            addDelta(npc.travellingTo, commId, qty)
+          }
+        }
+      }
+      return {
+        ...npc,
+        status: 'docked',
+        locationId: npc.travellingTo,
+        travellingTo: null,
+        departedFromId: null,
+        departedAt: null,
+        arrivalTime: null,
+        cargo: {},
+        credits: npc.credits + income,
+      }
+    }
+
+    // Find a trade route
+    if (npc.status === 'docked') {
+      const ship    = getShip(npc.shipId)
+      const srcLoc  = getLocation(npc.locationId)
+      const srcStock = $ms[npc.locationId]
+      if (!ship || !srcLoc || !srcStock) return npc
+
+      let bestProfit = 100  // minimum to be worth moving
+      let bestCommId = null
+      let bestDestId = null
+      let bestQty    = 0
+
+      for (const destLoc of locations) {
+        if (destLoc.id === npc.locationId || destLoc.id === 'space' || destLoc.parentId) continue
+        const dist = travelDistance(srcLoc, destLoc)
+        if (dist > ship.jumpDistance) continue
+        const destStock = $ms[destLoc.id]
+        if (!destStock) continue
+
+        for (const comm of commodities) {
+          const srcInfo  = srcStock[comm.id]
+          const destInfo = destStock[comm.id]
+          if (!srcInfo || !destInfo) continue
+
+          const avail = effectiveStock(npc.locationId, comm.id)
+          if (avail < 1) continue
+
+          const buyP  = npcBuyPrice(srcInfo)
+          const sellP = npcSellPrice(destInfo)
+          if (sellP <= buyP) continue
+
+          const profitPerUnit = sellP - buyP
+          const canAfford = buyP > 0 ? Math.floor(npc.credits / buyP) : 0
+          const qty = Math.min(canAfford, ship.cargoCapacity, avail)
+          const totalProfit = profitPerUnit * qty
+
+          if (totalProfit > bestProfit) {
+            bestProfit = totalProfit
+            bestCommId = comm.id
+            bestDestId = destLoc.id
+            bestQty    = qty
+          }
+        }
+      }
+
+      if (bestCommId && bestDestId && bestQty > 0) {
+        const srcInfo = srcStock[bestCommId]
+        const cost    = npcBuyPrice(srcInfo) * bestQty
+        addDelta(npc.locationId, bestCommId, -bestQty)
+
+        const toLoc = getLocation(bestDestId)
+        const dist  = travelDistance(srcLoc, toLoc)
+        const secs  = Math.max(3, Math.round(dist / ship.speed))
+
+        return {
+          ...npc,
+          status: 'travelling',
+          travellingTo: bestDestId,
+          departedFromId: npc.locationId,
+          departedAt: now,
+          arrivalTime: now + secs * 1000,
+          cargo: { [bestCommId]: bestQty },
+          credits: npc.credits - cost,
+        }
+      }
+    }
+
+    return npc
+  })
+
+  // Apply accumulated stock deltas
+  if (Object.keys(stockDeltas).length > 0) {
+    marketStock.update(ms => {
+      const result = { ...ms }
+      for (const [locId, changes] of Object.entries(stockDeltas)) {
+        if (!result[locId]) continue
+        const locStock = { ...result[locId] }
+        for (const [commId, delta] of Object.entries(changes)) {
+          if (locStock[commId]) {
+            locStock[commId] = {
+              ...locStock[commId],
+              stock: Math.max(0, Math.min(locStock[commId].stockCap, locStock[commId].stock + delta)),
+            }
+          }
+        }
+        result[locId] = locStock
+      }
+      return result
+    })
+  }
+
+  npcs.set(updated)
+}
+
+// ─── Stock replenishment ──────────────────────────────────────────────────────
+
+function replenishStock() {
+  marketStock.update(ms => {
+    const result = {}
+    for (const [locId, locStock] of Object.entries(ms)) {
+      const updated = {}
+      for (const [commId, info] of Object.entries(locStock)) {
+        let newStock = info.stock
+        // Producers generate supply
+        if (info.isProducer) newStock += info.supplyRate
+        // Small passive trickle for all (prevents total lock-out)
+        else newStock += Math.ceil(info.supplyRate * 0.15)
+        // Consumers slowly drain (simulating local usage)
+        if (info.isConsumer) newStock -= Math.ceil(info.consumeRate * 0.25)
+        // Floor at 5% of capacity so markets never fully dry up
+        const floor = Math.max(1, Math.round(info.stockCap * 0.05))
+        newStock = Math.max(floor, Math.min(info.stockCap, Math.round(newStock)))
+        updated[commId] = { ...info, stock: newStock }
+      }
+      result[locId] = updated
+    }
+    return result
+  })
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+// Pre-seed stock for player starting location and all NPC starting locations
+const seedLocations = ['earth', ...NPC_DEFS.map(d => d.startLoc)]
+for (const id of seedLocations) ensureMarketStock(id)
+
 addLog('Welcome to Space Flight Inc. Docked at Earth. Good luck, Commander.', 'info')
+
+// NPC AI — runs every 2 seconds
+setInterval(npcTick, 2000)
+
+// Stock replenishment — runs every 30 seconds
+setInterval(replenishStock, 30000)
