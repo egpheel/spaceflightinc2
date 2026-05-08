@@ -1,21 +1,20 @@
-// speed: dunits/second (1 dunit = 0.1 AU)
+// speed: dunits/game-day  (travel time = dist/speed × 86400/GAME_TIME_SCALE real-seconds)
 // jumpDistance: max single-hop range in dunits
 // cargoCapacity: max cargo units
 // price: cost in credits
 //
-// Travel time reference (distance / speed):
-//   Earth-Mars min ~5 du  at 0.010 du/s = ~8 min
-//   Earth-Jupiter min ~42 du at 0.010 du/s = ~70 min
-//   Jupiter-Saturn min ~44 du at 0.007 du/s = ~105 min
+// At GAME_TIME_SCALE = 365.25/14 one game-day ≈ 3311 real-seconds.
+// Travel time reference:
+//   Earth→Mars min (5 du) at speed 33 du/day → 502s ≈ 8 min
+//   Earth→Jupiter min (42 du) at speed 33 → 4216s ≈ 70 min
 
 export const ships = [
   // ─── Class: Scout ──────────────────────────────────────────────────────────
-  // Fast and nimble, minimal cargo. Best for scouting routes and quick hops.
   {
     id: 'dart-i',
     name: 'Dart I',
     class: 'Scout',
-    speed: 0.010,
+    speed: 33,
     jumpDistance: 50,
     cargoCapacity: 12,
     price: 1500,
@@ -26,7 +25,7 @@ export const ships = [
     id: 'dart-ii',
     name: 'Dart II',
     class: 'Scout',
-    speed: 0.013,
+    speed: 43,
     jumpDistance: 70,
     cargoCapacity: 18,
     price: 3200,
@@ -37,7 +36,7 @@ export const ships = [
     id: 'phantom',
     name: 'Phantom',
     class: 'Scout',
-    speed: 0.016,
+    speed: 53,
     jumpDistance: 90,
     cargoCapacity: 14,
     price: 6500,
@@ -48,7 +47,7 @@ export const ships = [
     id: 'eclipse',
     name: 'Eclipse',
     class: 'Scout',
-    speed: 0.020,
+    speed: 66,
     jumpDistance: 120,
     cargoCapacity: 10,
     price: 12000,
@@ -61,7 +60,7 @@ export const ships = [
     id: 'relay-mk1',
     name: 'Relay MK1',
     class: 'Courier',
-    speed: 0.007,
+    speed: 23,
     jumpDistance: 60,
     cargoCapacity: 55,
     price: 4500,
@@ -72,7 +71,7 @@ export const ships = [
     id: 'relay-mk2',
     name: 'Relay MK2',
     class: 'Courier',
-    speed: 0.009,
+    speed: 30,
     jumpDistance: 80,
     cargoCapacity: 70,
     price: 8500,
@@ -83,7 +82,7 @@ export const ships = [
     id: 'swift-arrow',
     name: 'Swift Arrow',
     class: 'Courier',
-    speed: 0.011,
+    speed: 36,
     jumpDistance: 100,
     cargoCapacity: 80,
     price: 14000,
@@ -94,7 +93,7 @@ export const ships = [
     id: 'falcon-x',
     name: 'Falcon X',
     class: 'Courier',
-    speed: 0.014,
+    speed: 46,
     jumpDistance: 130,
     cargoCapacity: 90,
     price: 22000,
@@ -107,7 +106,7 @@ export const ships = [
     id: 'iron-mule',
     name: 'Iron Mule',
     class: 'Freighter',
-    speed: 0.004,
+    speed: 13,
     jumpDistance: 40,
     cargoCapacity: 150,
     price: 9000,
@@ -118,7 +117,7 @@ export const ships = [
     id: 'cargo-king',
     name: 'Cargo King',
     class: 'Freighter',
-    speed: 0.0045,
+    speed: 15,
     jumpDistance: 50,
     cargoCapacity: 210,
     price: 16000,
@@ -129,7 +128,7 @@ export const ships = [
     id: 'void-hauler',
     name: 'Void Hauler',
     class: 'Freighter',
-    speed: 0.005,
+    speed: 17,
     jumpDistance: 60,
     cargoCapacity: 270,
     price: 24000,
@@ -140,7 +139,7 @@ export const ships = [
     id: 'star-ox',
     name: 'Star Ox',
     class: 'Freighter',
-    speed: 0.006,
+    speed: 20,
     jumpDistance: 75,
     cargoCapacity: 330,
     price: 34000,
@@ -153,7 +152,7 @@ export const ships = [
     id: 'titan-hauler',
     name: 'Titan Hauler',
     class: 'Heavy Freighter',
-    speed: 0.0025,
+    speed: 8,
     jumpDistance: 30,
     cargoCapacity: 550,
     price: 40000,
@@ -164,7 +163,7 @@ export const ships = [
     id: 'colossus-i',
     name: 'Colossus I',
     class: 'Heavy Freighter',
-    speed: 0.0018,
+    speed: 6,
     jumpDistance: 25,
     cargoCapacity: 750,
     price: 58000,
@@ -175,7 +174,7 @@ export const ships = [
     id: 'colossus-ii',
     name: 'Colossus II',
     class: 'Heavy Freighter',
-    speed: 0.0013,
+    speed: 4,
     jumpDistance: 22,
     cargoCapacity: 980,
     price: 80000,
@@ -186,7 +185,7 @@ export const ships = [
     id: 'leviathan',
     name: 'Leviathan',
     class: 'Heavy Freighter',
-    speed: 0.001,
+    speed: 3,
     jumpDistance: 18,
     cargoCapacity: 1300,
     price: 115000,
@@ -199,7 +198,7 @@ export const ships = [
     id: 'wanderer',
     name: 'Wanderer',
     class: 'Explorer',
-    speed: 0.007,
+    speed: 23,
     jumpDistance: 150,
     cargoCapacity: 45,
     price: 18000,
@@ -210,7 +209,7 @@ export const ships = [
     id: 'horizon-seeker',
     name: 'Horizon Seeker',
     class: 'Explorer',
-    speed: 0.009,
+    speed: 30,
     jumpDistance: 200,
     cargoCapacity: 40,
     price: 30000,
@@ -221,7 +220,7 @@ export const ships = [
     id: 'deep-scout',
     name: 'Deep Scout',
     class: 'Explorer',
-    speed: 0.012,
+    speed: 40,
     jumpDistance: 280,
     cargoCapacity: 35,
     price: 48000,
@@ -232,7 +231,7 @@ export const ships = [
     id: 'pioneer',
     name: 'Pioneer',
     class: 'Explorer',
-    speed: 0.015,
+    speed: 50,
     jumpDistance: 400,
     cargoCapacity: 30,
     price: 75000,

@@ -58,7 +58,7 @@
     </div>
     <div class="stat-item hidden md:flex">
       <span class="label">SPEED</span>
-      <span class="value">{ship?.speed} du/s</span>
+      <span class="value">{ship?.speed} du/day</span>
     </div>
     <div class="stat-item hidden md:flex">
       <span class="label">RANGE</span>

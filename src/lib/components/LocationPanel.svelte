@@ -1,6 +1,15 @@
 <script>
   import { player, currentShip, selectedLocationId, startTravel } from '../stores/gameStore.js'
-  import { getLocation, getMoons, travelDistance, factions } from '../data/locations.js'
+  import { getLocation, getMoons, travelDistance, factions, GAME_TIME_SCALE } from '../data/locations.js'
+
+  function formatETA(secs) {
+    if (secs < 60) return secs + 's'
+    const m = Math.round(secs / 60)
+    if (m < 60) return m + 'm'
+    const h = Math.floor(m / 60)
+    const mins = m % 60
+    return mins > 0 ? `${h}h ${mins}m` : `${h}h`
+  }
 
   $: selectedLoc = getLocation($selectedLocationId)
   $: currentLoc = getLocation($player.locationId)
@@ -12,9 +21,10 @@
     ? travelDistance(currentLoc, selectedLoc)
     : null
 
-  $: eta = (dist !== null && ship)
-    ? Math.max(1, Math.round(dist / ship.speed))
+  $: etaSecs = (dist !== null && ship)
+    ? Math.max(60, Math.round((dist / ship.speed) * (86400 / GAME_TIME_SCALE)))
     : null
+  $: eta = etaSecs !== null ? formatETA(etaSecs) : null
 
   $: inRange = dist !== null && ship ? dist <= ship.jumpDistance : false
   $: isCurrent = selectedLoc?.id === $player.locationId
@@ -64,7 +74,7 @@
           <div class="font-mono-space text-xs text-slate-400">{dist.toFixed(2)} du</div>
           {#if eta !== null}
             <div class="font-mono-space text-xs {inRange ? 'text-cyan-400' : 'text-red-400'}">
-              {inRange ? eta + 's' : 'OUT OF RANGE'}
+              {inRange ? eta : 'OUT OF RANGE'}
             </div>
           {/if}
         </div>
@@ -170,7 +180,7 @@
         {#if !inRange}
           ✕ OUT OF RANGE ({dist?.toFixed(1)} / {ship?.jumpDistance} du)
         {:else}
-          → JUMP TO {selectedLoc.name.toUpperCase()} ({eta}s)
+          → JUMP TO {selectedLoc.name.toUpperCase()} ({eta})
         {/if}
       </button>
     </div>

@@ -1,5 +1,19 @@
 import { writable, derived, get } from 'svelte/store'
-import { getLocation, travelDistance, bodyPosition, cometPositionDU, pointSegmentDist, comets, locations } from '../data/locations.js'
+import { getLocation, travelDistance, bodyPosition, cometPositionDU, pointSegmentDist, comets, locations, GAME_TIME_SCALE } from '../data/locations.js'
+
+// Converts a game-day speed (du/game-day) to real travel seconds
+function realTravelSecs(dist, speedPerGameDay) {
+  return Math.max(60, Math.round((dist / speedPerGameDay) * (86400 / GAME_TIME_SCALE)))
+}
+
+function formatETA(secs) {
+  if (secs < 60) return secs + 's'
+  const m = Math.round(secs / 60)
+  if (m < 60) return m + 'm'
+  const h = Math.floor(m / 60)
+  const mins = m % 60
+  return mins > 0 ? `${h}h ${mins}m` : `${h}h`
+}
 import { getShip } from '../data/ships.js'
 import { generateMarketStock, stockPrice, getCommodity, commodities } from '../data/commodities.js'
 import { rollEvent } from '../data/events.js'
@@ -147,7 +161,7 @@ export function startTravel(destinationId) {
     return
   }
 
-  const travelSecs = Math.max(30, Math.round(dist / $ship.speed))
+  const travelSecs  = realTravelSecs(dist, $ship.speed)
   const arrivalTime = Date.now() + travelSecs * 1000
   const departedAt  = Date.now()
 
@@ -164,8 +178,7 @@ export function startTravel(destinationId) {
     statusMessage: `Travelling to ${to.name}`,
   }))
 
-  const etaMin = Math.round(travelSecs / 60)
-  addLog(`Departed for ${to.name} — ETA ${etaMin > 0 ? etaMin + 'm' : travelSecs + 's'}`, 'travel')
+  addLog(`Departed for ${to.name} — ETA ${formatETA(travelSecs)}`, 'travel')
 
   // Check if any comet's current position lies within 2 du of our route
   const fromPos = bodyPosition(from)
@@ -211,9 +224,13 @@ export function startTravel(destinationId) {
 
     if (event && !eventFired && eventTriggerTime && now >= eventTriggerTime && $cur.status === 'travelling') {
       eventFired = true
-      clearInterval(travelInterval)
-      pendingEvent.set({ ...event, destinationId, originalArrivalTime: $cur.arrivalTime })
-      player.update(p => ({ ...p, status: 'event' }))
+      // Auto-resolve: pick a random affordable choice, apply immediately without pausing
+      const affordable = event.choices.filter(c => !c.requiresCredits || get(player).credits >= c.requiresCredits)
+      const pool   = affordable.length > 0 ? affordable : event.choices
+      const choice = pool[Math.floor(Math.random() * pool.length)]
+      addLog(`[${event.name}] ${choice.description}`, 'warning')
+      const remaining = Math.max(0, $cur.arrivalTime - now)
+      applyEffect(choice.effect, remaining, destinationId)
       return
     }
 
@@ -739,7 +756,7 @@ function npcTick() {
 
         const toLoc = getLocation(bestDestId)
         const dist  = travelDistance(srcLoc, toLoc)
-        const secs  = Math.max(3, Math.round(dist / ship.speed))
+        const secs  = realTravelSecs(dist, ship.speed)
 
         return {
           ...npc,
@@ -809,9 +826,9 @@ function replenishStock() {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-// Pre-seed stock for all main planets (non-moons) so NPC trade routes open immediately
+// Pre-seed stock for all locations that have a market (planets, moons, stations)
 for (const loc of locations) {
-  if (!loc.parentId && loc.id !== 'space') ensureMarketStock(loc.id)
+  if (loc.hasMarket) ensureMarketStock(loc.id)
 }
 
 addLog('Welcome to Space Flight Inc. Docked at Earth. Good luck, Commander.', 'info')

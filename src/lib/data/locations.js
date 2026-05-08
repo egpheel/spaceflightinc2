@@ -386,8 +386,8 @@ export const locations = [
 ]
 
 // ─── Orbital animation ────────────────────────────────────────────────────────
-// 1 game year = 1 IRL month (30.4375 days). Scale: 365.25 / 30.4375 ≈ 12
-export const GAME_TIME_SCALE = 365.25 / 30.4375
+// 1 game year = 14 IRL days. Scale: 365.25 / 14 ≈ 26.09 game-days per IRL day
+export const GAME_TIME_SCALE = 365.25 / 14
 // Reference epoch: May 8, 2026 00:00 UTC
 export const START_EPOCH_MS = 1746662400000
 
