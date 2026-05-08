@@ -1,0 +1,231 @@
+// speed: dunits/second (higher = faster travel)
+// jumpDistance: max single-hop range in dunits
+// cargoCapacity: max cargo units
+// price: cost in credits
+
+export const ships = [
+  // ─── Class: Scout ──────────────────────────────────────────────────────────
+  // Fast and nimble, minimal cargo. Best for scouting routes and quick hops.
+  {
+    id: 'dart-i',
+    name: 'Dart I',
+    class: 'Scout',
+    speed: 4,
+    jumpDistance: 20,
+    cargoCapacity: 12,
+    price: 1500,
+    description: 'Entry-level scout. Quick across short hops but hauls almost nothing.',
+  },
+  {
+    id: 'dart-ii',
+    name: 'Dart II',
+    class: 'Scout',
+    speed: 5,
+    jumpDistance: 26,
+    cargoCapacity: 18,
+    price: 3200,
+    description: 'Improved scout with a modest cargo bay. Good for early inner-system runs.',
+  },
+  {
+    id: 'phantom',
+    name: 'Phantom',
+    class: 'Scout',
+    speed: 6.5,
+    jumpDistance: 33,
+    cargoCapacity: 14,
+    price: 6500,
+    description: 'Speed-optimised hull. Reaches Saturn from Jupiter in a single jump.',
+  },
+  {
+    id: 'eclipse',
+    name: 'Eclipse',
+    class: 'Scout',
+    speed: 9,
+    jumpDistance: 40,
+    cargoCapacity: 10,
+    price: 12000,
+    description: 'Top-of-class scout. Near-instant inner hops. Minimal cargo — pure speed.',
+  },
+
+  // ─── Class: Courier ────────────────────────────────────────────────────────
+  // Balanced speed and cargo. The workhorse for most mid-game trade routes.
+  {
+    id: 'relay-mk1',
+    name: 'Relay MK1',
+    class: 'Courier',
+    speed: 3,
+    jumpDistance: 22,
+    cargoCapacity: 55,
+    price: 4500,
+    description: 'The classic courier. Reliable, affordable, gets the job done.',
+  },
+  {
+    id: 'relay-mk2',
+    name: 'Relay MK2',
+    class: 'Courier',
+    speed: 3.5,
+    jumpDistance: 28,
+    cargoCapacity: 70,
+    price: 8500,
+    description: 'Upgraded relay with extended jump range. Can reach Saturn from Earth.',
+  },
+  {
+    id: 'swift-arrow',
+    name: 'Swift Arrow',
+    class: 'Courier',
+    speed: 4.5,
+    jumpDistance: 34,
+    cargoCapacity: 80,
+    price: 14000,
+    description: 'Fast courier with solid cargo. A favourite among mid-tier traders.',
+  },
+  {
+    id: 'falcon-x',
+    name: 'Falcon X',
+    class: 'Courier',
+    speed: 5.5,
+    jumpDistance: 42,
+    cargoCapacity: 90,
+    price: 22000,
+    description: 'Premium courier. Long jump range covers the mid-outer system comfortably.',
+  },
+
+  // ─── Class: Freighter ──────────────────────────────────────────────────────
+  // Moderate speed, significant cargo. The backbone of serious trade operations.
+  {
+    id: 'iron-mule',
+    name: 'Iron Mule',
+    class: 'Freighter',
+    speed: 2,
+    jumpDistance: 16,
+    cargoCapacity: 150,
+    price: 9000,
+    description: "Slow but dependable. The trader's bread-and-butter for inner routes.",
+  },
+  {
+    id: 'cargo-king',
+    name: 'Cargo King',
+    class: 'Freighter',
+    speed: 2.3,
+    jumpDistance: 20,
+    cargoCapacity: 210,
+    price: 16000,
+    description: 'A step up from the Iron Mule. More cargo, slightly longer range.',
+  },
+  {
+    id: 'void-hauler',
+    name: 'Void Hauler',
+    class: 'Freighter',
+    speed: 2.6,
+    jumpDistance: 24,
+    cargoCapacity: 270,
+    price: 24000,
+    description: 'Mid-tier freighter covering the asteroid belt and Jupiter routes well.',
+  },
+  {
+    id: 'star-ox',
+    name: 'Star Ox',
+    class: 'Freighter',
+    speed: 3,
+    jumpDistance: 28,
+    cargoCapacity: 330,
+    price: 34000,
+    description: 'Heavy freighter that keeps reasonable speed. Respected on outer routes.',
+  },
+
+  // ─── Class: Heavy Freighter ────────────────────────────────────────────────
+  // Massive cargo, very slow, short jump range. Maximum profit per run but inflexible.
+  {
+    id: 'titan-hauler',
+    name: 'Titan Hauler',
+    class: 'Heavy Freighter',
+    speed: 1.2,
+    jumpDistance: 13,
+    cargoCapacity: 550,
+    price: 40000,
+    description: 'Enormous cargo bay. Requires careful route planning around its limited range.',
+  },
+  {
+    id: 'colossus-i',
+    name: 'Colossus I',
+    class: 'Heavy Freighter',
+    speed: 1.0,
+    jumpDistance: 10,
+    cargoCapacity: 750,
+    price: 58000,
+    description: 'Bulk carrier. Pair it with scout escorts and plan your hops carefully.',
+  },
+  {
+    id: 'colossus-ii',
+    name: 'Colossus II',
+    class: 'Heavy Freighter',
+    speed: 0.8,
+    jumpDistance: 8,
+    cargoCapacity: 980,
+    price: 80000,
+    description: 'A floating warehouse. Barely moves but single runs pay enormous sums.',
+  },
+  {
+    id: 'leviathan',
+    name: 'Leviathan',
+    class: 'Heavy Freighter',
+    speed: 0.6,
+    jumpDistance: 6,
+    cargoCapacity: 1300,
+    price: 115000,
+    description: 'The largest commercial ship available. Requires relay stations for outer runs.',
+  },
+
+  // ─── Class: Explorer ───────────────────────────────────────────────────────
+  // Very long jump range, moderate cargo. Built for the outer system.
+  {
+    id: 'wanderer',
+    name: 'Wanderer',
+    class: 'Explorer',
+    speed: 2.5,
+    jumpDistance: 60,
+    cargoCapacity: 45,
+    price: 18000,
+    description: 'Entry-level explorer. Its long range opens up the entire outer system.',
+  },
+  {
+    id: 'horizon-seeker',
+    name: 'Horizon Seeker',
+    class: 'Explorer',
+    speed: 3,
+    jumpDistance: 78,
+    cargoCapacity: 40,
+    price: 30000,
+    description: 'Can reach Neptune from Jupiter in a single jump. Premium deep-space hull.',
+  },
+  {
+    id: 'deep-scout',
+    name: 'Deep Scout',
+    class: 'Explorer',
+    speed: 4,
+    jumpDistance: 95,
+    cargoCapacity: 35,
+    price: 48000,
+    description: 'Covers the entire solar system in a handful of hops. Best-in-class range.',
+  },
+  {
+    id: 'pioneer',
+    name: 'Pioneer',
+    class: 'Explorer',
+    speed: 5,
+    jumpDistance: 120,
+    cargoCapacity: 30,
+    price: 75000,
+    description: 'End-game explorer. Earth to Pluto without stopping. Legendary range.',
+  },
+]
+
+export const shipClasses = ['Scout', 'Courier', 'Freighter', 'Heavy Freighter', 'Explorer']
+
+export function getShip(id) {
+  return ships.find(s => s.id === id)
+}
+
+export function getShipsByClass(cls) {
+  return ships.filter(s => s.class === cls)
+}
