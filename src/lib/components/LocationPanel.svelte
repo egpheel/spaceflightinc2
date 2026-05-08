@@ -1,4 +1,5 @@
 <script>
+  import { onMount, onDestroy } from 'svelte'
   import { player, currentShip, selectedLocationId, startTravel } from '../stores/gameStore.js'
   import { getLocation, getMoons, travelDistance, factions, GAME_TIME_SCALE } from '../data/locations.js'
 
@@ -11,13 +12,19 @@
     return mins > 0 ? `${h}h ${mins}m` : `${h}h`
   }
 
+  // Ticker so distance/ETA recalculate as planets move
+  let now = Date.now()
+  let ticker
+  onMount(() => { ticker = setInterval(() => { now = Date.now() }, 3000) })
+  onDestroy(() => clearInterval(ticker))
+
   $: selectedLoc = getLocation($selectedLocationId)
   $: currentLoc = getLocation($player.locationId)
   $: ship = $currentShip
   $: moons = selectedLoc ? getMoons(selectedLoc.id) : []
   $: parentLoc = selectedLoc?.parentId ? getLocation(selectedLoc.parentId) : null
 
-  $: dist = (selectedLoc && currentLoc)
+  $: dist = (selectedLoc && currentLoc && now)
     ? travelDistance(currentLoc, selectedLoc)
     : null
 
