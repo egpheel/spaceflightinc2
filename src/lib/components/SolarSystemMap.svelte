@@ -2,24 +2,24 @@
   import { onMount, onDestroy } from 'svelte'
   import { player, currentShip, selectedLocationId, npcs, startTravel } from '../stores/gameStore.js'
   import {
-    locations, comets,
+    locations, comets, DU_TO_PX,
     currentAngle, orbitPosition, bodyPosition, travelDistance,
     cometSVGPosition, cometOrbitEllipse,
     getLocation, getMoons, getPlanets,
   } from '../data/locations.js'
 
   // ── ViewBox state (pan + zoom) ─────────────────────────────────────────────
-  let vbX = -500, vbY = -500, vbW = 1000, vbH = 1000
+  let vbX = -600, vbY = -600, vbW = 1200, vbH = 1200
   $: viewBox = `${vbX.toFixed(1)} ${vbY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`
 
-  const VB_MIN = 220   // max zoom-in
-  const VB_MAX = 2200  // max zoom-out
+  const VB_MIN = 40    // max zoom-in (close to a planet)
+  const VB_MAX = 12000 // max zoom-out (full solar system)
 
   function clampVB() {
     vbW = Math.max(VB_MIN, Math.min(VB_MAX, vbW))
-    vbH = vbW  // maintain square aspect
-    vbX = Math.max(-2500, Math.min(2500, vbX))
-    vbY = Math.max(-2500, Math.min(2500, vbY))
+    vbH = vbW
+    vbX = Math.max(-7000, Math.min(7000, vbX))
+    vbY = Math.max(-7000, Math.min(7000, vbY))
   }
 
   // ── Drag (mouse) ───────────────────────────────────────────────────────────
@@ -53,16 +53,14 @@
     e.preventDefault()
     const factor = e.deltaY < 0 ? 0.85 : 1.18
     const rect   = svgEl.getBoundingClientRect()
-    // Mouse position in SVG space
     const mx = vbX + ((e.clientX - rect.left) / rect.width)  * vbW
     const my = vbY + ((e.clientY - rect.top)  / rect.height) * vbH
-    const newW = vbW * factor
-    const newH = vbH * factor
+    // Clamp size BEFORE recomputing origin to avoid pan drift at limits
+    const newW = Math.max(VB_MIN, Math.min(VB_MAX, vbW * factor))
     vbX = mx - ((e.clientX - rect.left) / rect.width)  * newW
-    vbY = my - ((e.clientY - rect.top)  / rect.height) * newH
+    vbY = my - ((e.clientY - rect.top)  / rect.height) * newW
     vbW = newW
-    vbH = newH
-    clampVB()
+    vbH = newW
   }
 
   // ── Touch (pan + pinch zoom) ───────────────────────────────────────────────
@@ -126,16 +124,28 @@
   function onTouchEnd() { lastTouchDist = null }
 
   // ── Zoom buttons ───────────────────────────────────────────────────────────
-  function zoomIn()  { vbW *= 0.75; vbH = vbW; clampVB() }
-  function zoomOut() { vbW *= 1.33; vbH = vbW; clampVB() }
-  function resetView() { vbX = -500; vbY = -500; vbW = 1000; vbH = 1000 }
+  function zoomIn()  { vbW = Math.max(VB_MIN, vbW * 0.75); vbH = vbW }
+  function zoomOut() { vbW = Math.min(VB_MAX, vbW * 1.33); vbH = vbW }
+  function resetView() { vbX = -600; vbY = -600; vbW = 1200; vbH = 1200 }
 
   // ── Live orbit animation ───────────────────────────────────────────────────
-  // VISUAL_MULT speeds up displayed orbits so planets are visibly moving within
-  // a play session. Physics (bodyPosition / travelDistance) is unaffected.
-  const VISUAL_MULT = 500
+  // GAME_TIME_SCALE = 365.25 means 1 IRL day = 1 game year, so planets orbit
+  // at a visible rate (Earth ~1 day, Mercury ~6 hours). No visual multiplier needed.
 
   const topLevelLocations = getPlanets()
+
+  // Moon orbital periods in game-days (= Earth days)
+  const MOON_PERIODS = {
+    luna: 27.32, phobos: 0.319, deimos: 1.263,
+    io: 1.769, europa: 3.551, ganymede: 7.155, callisto: 16.69,
+    amalthea: 0.498, himalia: 250.6,
+    titan: 15.945, enceladus: 1.370, rhea: 4.518, dione: 2.737,
+    tethys: 1.888, iapetus: 79.33, mimas: 0.942, hyperion: 21.28, phoebe: 550.5,
+    miranda: 1.413, ariel: 2.520, umbriel: 4.144, titania: 8.706, oberon: 13.46,
+    triton: 5.877, nereid: 360.14, proteus: 1.122, larissa: 0.555,
+    charon: 6.387, nix: 24.85, hydra: 38.20,
+  }
+
   let now = Date.now()
   let animFrame
 
@@ -147,14 +157,35 @@
   onMount(() => { animFrame = requestAnimationFrame(updateOrbits) })
   onDestroy(() => { if (animFrame) cancelAnimationFrame(animFrame) })
 
-  // Derived from `now` so Svelte re-evaluates every animation frame
+  // Planet angles — derived from `now` so Svelte re-evaluates every frame
   $: planetAngles = now ? Object.fromEntries(
     topLevelLocations.map(loc => [loc.id,
-      loc.orbitalPeriodDays
-        ? currentAngle(loc.startAngle, loc.orbitalPeriodDays, VISUAL_MULT)
-        : (loc.startAngle ?? 0)
+      loc.orbitalPeriodDays ? currentAngle(loc.startAngle, loc.orbitalPeriodDays) : (loc.startAngle ?? 0)
     ])
   ) : {}
+
+  // Moon SVG positions — also derived from `now`
+  $: moonData = now ? locations
+    .filter(l => l.parentId && l.moonOrbitRadius)
+    .map(moon => {
+      const parent = topLevelLocations.find(p => p.id === moon.parentId)
+      if (!parent) return null
+      const parentAngle = planetAngles[parent.id] ?? parent.startAngle ?? 0
+      const parentPos   = orbitPosition(parent.solarDistance * DU_TO_PX, parentAngle)
+      const period = MOON_PERIODS[moon.id]
+      if (!period) return null
+      const deg = currentAngle(moon.moonAngle ?? moon.angle ?? 0, period)
+      const rad = deg * Math.PI / 180
+      return {
+        id: moon.id, name: moon.name, color: moon.color,
+        orbitR: moon.moonOrbitRadius,
+        px: parentPos.x, py: parentPos.y,
+        x: parentPos.x + moon.moonOrbitRadius * Math.cos(rad),
+        y: parentPos.y + moon.moonOrbitRadius * Math.sin(rad),
+      }
+    })
+    .filter(Boolean)
+  : []
 
   $: cometPositions = now ? Object.fromEntries(
     comets.map(c => [c.id, cometSVGPosition(c, now)])
@@ -163,7 +194,7 @@
   // ── Position helpers ───────────────────────────────────────────────────────
   function getPlanetPos(loc) {
     const angle = planetAngles[loc.id] ?? loc.startAngle ?? 0
-    return orbitPosition(loc.orbitRadius, angle)
+    return orbitPosition(loc.solarDistance * DU_TO_PX, angle)
   }
 
   function getSVGPos(locationId) {
@@ -187,7 +218,7 @@
     ? (topLevelLocations.find(l => l.id === playerParentId) ?? playerLoc)
     : (topLevelLocations.find(l => l.id === playerLoc?.id) ?? null)
   $: playerPos = playerPlanetLoc
-    ? orbitPosition(playerPlanetLoc.orbitRadius, planetAngles[playerPlanetLoc.id] ?? playerPlanetLoc.startAngle ?? 0)
+    ? orbitPosition(playerPlanetLoc.solarDistance * DU_TO_PX, planetAngles[playerPlanetLoc.id] ?? playerPlanetLoc.startAngle ?? 0)
     : { x: 0, y: 0 }
 
   // ── Player ship animated position (lerps during travel) ────────────────────
@@ -217,7 +248,7 @@
         : topLevelLocations.find(l => l.id === destLoc.id))
     : null
   $: destPos = destPlanetLoc
-    ? orbitPosition(destPlanetLoc.orbitRadius, planetAngles[destPlanetLoc.id] ?? destPlanetLoc.startAngle ?? 0)
+    ? orbitPosition(destPlanetLoc.solarDistance * DU_TO_PX, planetAngles[destPlanetLoc.id] ?? destPlanetLoc.startAngle ?? 0)
     : null
 
   // ── Selected location ──────────────────────────────────────────────────────
@@ -288,9 +319,9 @@
     const x = Math.sin(seed + 1) * 10000
     return x - Math.floor(x)
   }
-  const stars = Array.from({ length: 400 }, (_, i) => ({
-    x: (seededRand(i * 3)     - 0.5) * 3600,
-    y: (seededRand(i * 3 + 1) - 0.5) * 3600,
+  const stars = Array.from({ length: 600 }, (_, i) => ({
+    x: (seededRand(i * 3)     - 0.5) * 12000,
+    y: (seededRand(i * 3 + 1) - 0.5) * 12000,
     r: seededRand(i * 3 + 2) * 1.5 + 0.3,
     o: seededRand(i * 3 + 3) * 0.6 + 0.3,
   }))
@@ -372,7 +403,7 @@
     </defs>
 
     <!-- Background -->
-    <rect x="-1800" y="-1800" width="3600" height="3600" fill="url(#bgGrad)"/>
+    <rect x="-6000" y="-6000" width="12000" height="12000" fill="url(#bgGrad)"/>
 
     <!-- Stars (spread wide for zoom headroom) -->
     {#each stars as s}
@@ -397,7 +428,7 @@
     <!-- Orbital rings -->
     {#each topLevelLocations as loc}
       <circle
-        cx="0" cy="0" r={loc.orbitRadius}
+        cx="0" cy="0" r={loc.solarDistance * DU_TO_PX}
         fill="none"
         stroke="rgba(148,163,184,0.12)"
         stroke-width={loc.type === 'station' ? 0.5 : 0.8}
@@ -422,7 +453,7 @@
     <!-- Planets -->
     {#each topLevelLocations as loc}
       {@const angle      = planetAngles[loc.id] ?? loc.startAngle ?? 0}
-      {@const pos        = orbitPosition(loc.orbitRadius, angle)}
+      {@const pos        = orbitPosition(loc.solarDistance * DU_TO_PX, angle)}
       {@const isSelected = selectedPlanetLoc?.id === loc.id}
       {@const reachable  = isReachable(loc)}
 
@@ -468,6 +499,13 @@
         text-anchor="middle" fill="rgba(226,232,240,0.7)"
         font-size="7" font-family="Space Mono, monospace"
         pointer-events="none">{loc.name}</text>
+    {/each}
+
+    <!-- Moon orbits and bodies -->
+    {#each moonData as moon}
+      <circle cx={moon.px} cy={moon.py} r={moon.orbitR}
+        fill="none" stroke="rgba(148,163,184,0.07)" stroke-width="0.4"/>
+      <circle cx={moon.x} cy={moon.y} r="2" fill={moon.color} opacity="0.65"/>
     {/each}
 
     <!-- NPC travel routes -->
